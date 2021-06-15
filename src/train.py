@@ -8,8 +8,8 @@ from ioutils import *
 
 
 def main(args):
-    #logging.basicConfig(filename="main.log", filemode="w", level=logging.INFO)
-    logging.basicConfig(filename="test_main.log", filemode="w", level=logging.DEBUG)
+    logging.basicConfig(filename="train.log", filemode="w", level=logging.INFO)
+    #logging.basicConfig(filename="train_debug.log", filemode="w", level=logging.DEBUG)
 
     logging.info(" [main] Initialization ...")
     vocab = load_vocab(args.vocab)
@@ -22,22 +22,24 @@ def main(args):
         positive=args.positive,
         negative=args.negative
     )
-    logging.debug(" [main] model: SkipGramSmoothing")
-    logging.debug(f" [main] dwe.vocab: {len(dwe.vocab)} words")
-    logging.debug(f" [main] dwe.T: {dwe.T}")
-    logging.debug(f" [main] dwe.D: {dwe.D}")
-    logging.debug(f" [main] dwe.mean_target: {dwe.mean_target.shape}")
-    logging.debug(f" [main] dwe.mean_context: {dwe.mean_context.shape}")
-    logging.debug(f" [main] dwe.vals: {dwe.vals}")
-    logging.debug(f" [main] dwe.cov: \n{dwe.cov}")
-    logging.debug(f" [main] dwe.v (size): {dwe.v_target.shape}")
-    logging.debug(f" [main] dwe.v (value): \n{dwe.v_target[0][0]}")
-    logging.debug(f" [main] dwe.w (size): {dwe.w_target.shape}")
-    logging.debug(f" [main] dwe.w (value): \n{dwe.w_target[0][0]}")
+    logging.debug(" [main] # model: SkipGramSmoothing")
+    logging.debug(f" [main] # dwe.vocab: {len(dwe.vocab)} words")
+    logging.debug(f" [main] # dwe.T: {dwe.T}")
+    logging.debug(f" [main] # dwe.D: {dwe.D}")
+    logging.debug(f" [main] # dwe.mean_target: {dwe.mean_target.shape}")
+    logging.debug(f" [main] # dwe.mean_context: {dwe.mean_context.shape}")
+    logging.debug(f" [main] # dwe.vals: {dwe.vals}")
+    logging.debug(f" [main] # dwe.cov: \n{dwe.cov}")
+    logging.debug(f" [main] # dwe.v (size): {dwe.v_target.shape}")
+    logging.debug(f" [main] # dwe.v (value): \n{dwe.v_target[0][0]}")
+    logging.debug(f" [main] # dwe.w (size): {dwe.w_target.shape}")
+    logging.debug(f" [main] # dwe.w (value): \n{dwe.w_target[0][0]}")
 
 
     logging.info(" [main] Pre-training ...")
-    dwe.pretrain(iter=2)
+    dwe.train(iter=2, rate=0.1)
+    logging.info(" [main] Training ...")
+    dwe.train(iter=2, rate=1.0)
 
 
 def cli_main():
