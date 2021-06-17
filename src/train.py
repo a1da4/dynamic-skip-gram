@@ -29,7 +29,7 @@ def main(args):
     logging.debug(f" [main] # dwe.mean_target: {dwe.mean_target.shape}")
     logging.debug(f" [main] # dwe.mean_context: {dwe.mean_context.shape}")
     logging.debug(f" [main] # dwe.vals: {dwe.vals}")
-    logging.debug(f" [main] # dwe.cov: \n{dwe.cov}")
+    logging.debug(f" [main] # dwe.precision: \n{dwe.precision}")
     logging.debug(f" [main] # dwe.v (size): {dwe.v_target.shape}")
     logging.debug(f" [main] # dwe.v (value): \n{dwe.v_target[0][0]}")
     logging.debug(f" [main] # dwe.w (size): {dwe.w_target.shape}")

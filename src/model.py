@@ -25,8 +25,8 @@ class SkipGramSmoothing:
         self.mean_context = np.zeros([self.V, dim, T])
         self.val0 = 1
         self.vals = [D * (taus[t + 1] - taus[t]) for t in range(T - 1)]
-        # cov: tridiagonal matrix
-        self.cov = np.zeros([T, T])
+        # precision: tridiagonal matrix
+        self.precision = np.zeros([T, T])
         for i in range(self.T):
             for j in range(self.T):
                 if i == j:
@@ -40,18 +40,18 @@ class SkipGramSmoothing:
                             + self.vals[i - 1] ** (-1)
                             + self.vals[i] ** (-1)
                         )
-                    self.cov[i][j] = v
+                    self.precision[i][j] = v
                 if i + 1 == j or i == j + 1:
                     v = -self.vals[min(i, j)] ** (-1)
-                    self.cov[i][j] = v
-        # cov = B^T@B, B: bidiagonal matrix
+                    self.precision[i][j] = v
+        # precision = B^T@B, B: bidiagonal matrix
         # v, w: variational parameters
         # e.g. T=4
         # B = [[v_u,1                  ]
         #      [w_u,1 v_u,2            ]
         #      [      w_u,2 v_u,3      ]
         #      [            w_u,3 v_u,4]]
-        B = np.linalg.cholesky(self.cov)
+        B = np.linalg.cholesky(self.precision)
         v = np.diag(B)
         w = np.diag(B, -1)
         self.v_target = np.tile(v, (self.V, dim, 1))
@@ -77,7 +77,7 @@ class SkipGramSmoothing:
 
     def _B_eachdim(self, v, w, word_id, dim_id):
         """reconstruct matrix B from v and w
-        :param v, w: float, variational parameters of B, B^T@B = cov
+        :param v, w: float, variational parameters of B, B^T@B = precision
         :param word_id, dim_id: int, word an dimension index
         :return: matrix B for word_id, dim_id overtime (T, T)
         """
@@ -85,7 +85,7 @@ class SkipGramSmoothing:
 
     def _sample_vec_eachdim(self, v, w, mean, word_id, dim_id):
         """sample single vector (Eq. S8 and S9)
-        :param v, w: float, variational parameters of B, B^T@B = cov
+        :param v, w: float, variational parameters of B, B^T@B = precision
         :param mean: float, mean
         :param word_id, dim_id: int, word and dimension index
         :return: sampled_vector
@@ -136,7 +136,7 @@ class SkipGramSmoothing:
         """
         gamma = self._gamma(i, target_vec, sampled_context_ids, sampled_v)
         # mean_grad: (D, T)
-        mean_grad = (rate * gamma.T - self.cov @ target_vec.T).T
+        mean_grad = (rate * gamma.T - self.precision @ target_vec.T).T
         v_grad = np.zeros([self.D, self.T])
         w_grad = np.zeros([self.D, self.T - 1])
         for d in range(self.D):
