@@ -2,8 +2,8 @@ import logging
 
 import numpy as np
 
-from ioutils import *
 from functions import *
+from ioutils import *
 from optimizer import Adam
 
 
@@ -249,3 +249,22 @@ class SkipGramSmoothing:
                 self.w_target[i] -= d_w
                 d_v = optim.step(step + 1, i, "v_target", self.v_target[i], v_grad)
                 self.v_target[i] = optim.update_enforce_positive(self.v_target[i], d_v)
+
+    def predict(self, word):
+        """predict target word vector
+        :param word: str, target word
+        :return: target_vecs (T, D)
+        """
+        if word in self.vocab:
+            word_id = self.vocab.index(word)
+        else:
+            assert False, "WordNotFoundError"
+        target_vecs = np.zeros([self.T, self.D])
+        for d in range(self.D):
+            B = self._B_eachdim(self.v_target, self.w_target, word_id, d)
+            cov = np.linalg.inv(B.T @ B)
+            vecs_eachdim = np.random.multivariate_normal(
+                self.mean_target[word_id][d], cov, 1
+            )[0]
+            target_vecs.T[d] += vecs_eachdim
+        return target_vecs
