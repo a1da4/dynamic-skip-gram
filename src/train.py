@@ -1,26 +1,29 @@
 import argparse
 import logging
+import pickle
 
 import numpy as np
 
-from model import *
 from ioutils import *
+from model import *
 
 
 def main(args):
-    logging.basicConfig(filename="train.log", filemode="w", level=logging.INFO)
-    #logging.basicConfig(filename="train_debug.log", filemode="w", level=logging.DEBUG)
+    # logging.basicConfig(filename="train.log", filemode="w", level=logging.INFO)
+    # logging.basicConfig(filename="train_debug.log", filemode="w", level=logging.DEBUG)
+    logging.basicConfig(level=logging.DEBUG)
 
     logging.info(" [main] Initialization ...")
     vocab = load_vocab(args.vocab)
+    time_range = args.time_end - args.time_start + 1
     dwe = SkipGramSmoothing(
         vocab=vocab,
-        T=args.num_time_step,
+        T=time_range,
         dim=args.dim,
         D=args.diffusion,
-        taus=args.time_stamps,
+        taus=range(args.time_start, args.time_end + 1),
         positive=args.positive,
-        negative=args.negative
+        negative=args.negative,
     )
     logging.debug(" [main] # model: SkipGramSmoothing")
     logging.debug(f" [main] # dwe.vocab: {len(dwe.vocab)} words")
@@ -35,17 +38,25 @@ def main(args):
     logging.debug(f" [main] # dwe.w (size): {dwe.w_target.shape}")
     logging.debug(f" [main] # dwe.w (value): \n{dwe.w_target[0][0]}")
 
-
     logging.info(" [main] Pre-training ...")
-    dwe.train(iter=2, rate=0.1)
+    dwe.train(iter=args.pretrain_iter, rate=0.1)
+    logging.info(" [main] # finished!")
+
     logging.info(" [main] Training ...")
-    dwe.train(iter=2, rate=1.0)
+    dwe.train(iter=args.train_iter, rate=1.0)
+    logging.info(" [main] # finished!")
+
+    logging.info(" [main] Save model ...")
+    pickle.dump(dwe, open("../dwe.pkl", "wb"))
+    logging.info(" [main] # finished!")
+    exit()
 
 
 def cli_main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--vocab", help="path of vocab")
-    parser.add_argument("--num_time_step", type=int)
+    parser.add_argument("--time_start", type=int)
+    parser.add_argument("--time_end", type=int)
     parser.add_argument("--dim", type=int, default=100)
     parser.add_argument(
         "--diffusion",
@@ -53,9 +64,10 @@ def cli_main():
         default=1,
         help="diffusion constant for variance in each time",
     )
-    parser.add_argument("--time_stamps", type=int, nargs="*")
     parser.add_argument("--positive", help="path of positive samples")
     parser.add_argument("--negative", help="path of negative samples")
+    parser.add_argument("--pretrain_iter", type=int, default=5000, help="iteration")
+    parser.add_argument("--train_iter", type=int, default=1000, help="iteration")
     args = parser.parse_args()
     main(args)
 
