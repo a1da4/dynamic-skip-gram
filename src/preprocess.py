@@ -89,9 +89,8 @@ def sample_negative(vocab, positive_samples, num_samples, time_range):
     :param positive_samples: co-occur matrix (T,V,V)
     :param num_samples: int, number of negative sample(s)
     :param time_range: int, total time span
-    :return: negative_samples, (T, V, V)
     """
-    negative_samples = []
+    os.makedirs(f"../negative_samples", exist_ok=True)
 
     for t in tqdm(range(time_range)):
         # total_freq_t: single value
@@ -106,15 +105,14 @@ def sample_negative(vocab, positive_samples, num_samples, time_range):
         del Pt_smoothed
         # negative_samples_t: (V, V)
         negative_samples_t = total_freq_t * Pt.reshape(-1, 1) * Pt_dash.reshape(1, -1)
-        negative_samples.append(negative_samples_t.tolist())
+        #negative_samples.append(negative_samples_t.tolist())
+        save_2d_matrix(negative_samples_t, name=f"negative_samples/{t}")
 
     logging.info(" [sample_negative] # finished!")
-    return negative_samples
 
 
 def preprocess(args):
-    # logging.basicConfig(filename="preprocess.log", filemode="w", level=logging.DEBUG)
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(filename="preprocess.log", filemode="w", level=logging.INFO)
     logging.debug(f" args: \n{args}")
     
     logging.info(" [preprocess] Obtain files ...") 
@@ -142,15 +140,9 @@ def preprocess(args):
         )
 
     logging.info(" [preprocess] Obtain negative samples ...")
-    if args.negative is None:
-        negative_samples = sample_negative(
-            vocab, positive_samples, args.num_samples, time_range
-        )
-        save_3d_matrix(negative_samples, name="negative_samples")
-    else:
-        negative_samples = load_3d_matrix(
-            args.negative, z_size=time_range, x_size=len(vocab), y_size=len(vocab)
-        )
+    sample_negative(
+        vocab, positive_samples, args.num_samples, time_range
+    )
 
 
 def cli_preprocess():
@@ -160,7 +152,6 @@ def cli_preprocess():
     parser.add_argument("--time_end", type=int)
     parser.add_argument("--vocab", help="path of vocab")
     parser.add_argument("--positive", help="path of positive samples")
-    parser.add_argument("--negative", help="path of negative samples")
     parser.add_argument(
         "--num_samples", type=int, default=1, help="num of negative samples"
     )
