@@ -5,6 +5,7 @@ import numpy as np
 from functions import *
 from ioutils import *
 from optimizer import Adam
+from tqdm import tqdm
 
 
 class SkipGramSmoothing:
@@ -104,21 +105,16 @@ class SkipGramSmoothing:
         :param sampled_v: vec(Vsampled, D, T), sampled context vectors
         :return: gamma(D, T)
         """
-        # TODO 時期で並列化
         gamma = np.zeros([self.D, self.T])
         target_vec = target_vec.T
         for t in range(self.T):
+            # n_p, n_n: (len(sampled_context_ids))
+            n_p = np.array(self.positives[t][i])[sampled_context_ids]
+            n_n = np.array(self.negatives[t][i])[sampled_context_ids]
+            # context_vecs: (len(sampled_context_ids), D)
+            context_vecs = sampled_v.T[t].T 
             # gamma_eachtime: (D)
-            gamma_eachtime = np.zeros([self.D])
-            # TODO 各文脈語で同時に計算できないか。アダマール積 * などを使う？
-            for sampled_context_id in range(len(sampled_context_ids)):
-                global_context_id = sampled_context_ids[sampled_context_id]
-                n_p = self.positives[t][i][global_context_id]
-                n_n = self.negatives[t][i][global_context_id]
-                context_vec = sampled_v[sampled_context_id].T[t]
-                gamma_eachtime += (
-                    (n_p + n_n) * sigmoid(target_vec[t].T @ context_vec) - n_n
-                ) * context_vec
+            gamma_eachtime = ((n_p + n_n) * sigmoid(target_vec[t]@context_vecs.T) - n_n)@context_vecs
             gamma.T[t] += gamma_eachtime
         return gamma
 
@@ -230,7 +226,7 @@ class SkipGramSmoothing:
 
             # estimate gradient
             logging.info(f" [{process}] ## estimate gradient and update...")
-            for i in range(len(sampled_target_ids)):
+            for i in tqdm(range(len(sampled_target_ids))):
                 # target_vec: (D, T)
                 target_vec = sampled_u[i]
                 mean_grad, v_grad, w_grad = self._estimate_gradient(
