@@ -13,7 +13,6 @@ from tqdm import tqdm
 
 def scrape_download_links(url):
     resp = urllib.request.urlopen(url)
-    # soup = BeautifulSoup(resp, from_encoding=resp.info().get_param("charset"))
     soup = BeautifulSoup(
         resp, from_encoding=resp.info().get_param("charset"), features="html.parser"
     )
@@ -37,11 +36,6 @@ def accept_links(links, acceptance_rate):
         if random.random() <= acceptance_rate:
             logging.info(f" [accept_links] accepted!: {links[i].split('/')[-1]}")
             accepted_links.append(links[i])
-        else: 
-            for target in ["-tv.gz", "-ba.gz", "-co.gz", "-ne.gz", "-nu.gz", "-os.gz", "-pe.gz", "-ph.gz", "-ra.gz", "-te.gz"]:
-                if target in links[i]:
-                    logging.info(f" [accept_links] accepted!: {links[i].split('/')[-1]}")
-                    accepted_links.append(links[i])
 
     logging.info(" [accept_links] finished!")
     logging.info(f" [accept_links] {len(accepted_links)} links accepted")
