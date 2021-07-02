@@ -1,6 +1,7 @@
 import argparse
 import logging
 import os
+import gzip
 
 import numpy as np
 from tqdm import tqdm
@@ -8,7 +9,7 @@ from tqdm import tqdm
 from ioutils import *
 
 
-def obtain_vocab(files, time_start, time_end, threshold=100, size=10000):
+def obtain_vocab(files, time_start, time_end, size):
     """obtain target vocaburaly
     :param files: list, path of files
     :param time_start, time_end: int
@@ -18,11 +19,11 @@ def obtain_vocab(files, time_start, time_end, threshold=100, size=10000):
     """
     vocab = []
     id2freq = []
-    for file in files:
+    for file in tqdm(files, "obtain vocab..."):
         logging.info(f" [obtain_vocab] # counting {file} ...")
-        with open(file) as fp:
+        with gzip.open(file) as fp:
             for line in fp:
-                words, year, freq, _ = line.strip().split("\t")
+                words, year, freq, _ = line.decode().strip().split("\t")
                 words = words.split()
                 if time_start <= int(year) <= time_end:
                     for word in words:
@@ -36,9 +37,9 @@ def obtain_vocab(files, time_start, time_end, threshold=100, size=10000):
         logging.debug(f" [obtain_vocab] ## total freq: {sum(id2freq)}")
     logging.debug(f" [obtain_vocab] # vocab: {len(vocab)} words: \n{vocab[:10]} ...")
 
-    target_ids = [freq >= threshold for freq in id2freq]
+    target_ids = set(np.argsort(-1 * np.array(id2freq))[:size])
 
-    target_vocab = [vocab[id] for id in range(len(vocab)) if target_ids[id]]
+    target_vocab = [vocab[id] for id in range(len(vocab)) if id in target_ids]
     logging.debug(f" [obtain_vocab] # target_vocab: {len(target_vocab)} words")
     return target_vocab
 
@@ -60,7 +61,7 @@ def sample_positive(files, vocab, time_start, time_end, time_range):
         del ps_tmp
     logging.info(f" [sample_positive] # finished! (size): ({len(positive_samples)}, {len(positive_samples[0])}, {len(positive_samples[0][0])}")
 
-    for file in files:
+    for file in tqdm(files, "obtrain positive samples..."):
         logging.info(f" [sample_positive] # counting {file} ...")
         with open(file) as fp:
             for line in fp:
@@ -92,7 +93,7 @@ def sample_negative(vocab, positive_samples, num_samples, time_range):
     """
     os.makedirs(f"../negative_samples", exist_ok=True)
 
-    for t in tqdm(range(time_range)):
+    for t in tqdm(range(time_range), "obtain negative samples..."):
         # total_freq_t: single value
         total_freq_t = sum([sum(ps_tmp) for ps_tmp in positive_samples[t]])
         # freq_matrix_t: (V, V) matrix
@@ -105,14 +106,13 @@ def sample_negative(vocab, positive_samples, num_samples, time_range):
         del Pt_smoothed
         # negative_samples_t: (V, V)
         negative_samples_t = total_freq_t * Pt.reshape(-1, 1) * Pt_dash.reshape(1, -1)
-        #negative_samples.append(negative_samples_t.tolist())
         save_2d_matrix(negative_samples_t, name=f"negative_samples/{t}")
 
     logging.info(" [sample_negative] # finished!")
 
 
 def preprocess(args):
-    logging.basicConfig(filename="preprocess.log", filemode="w", level=logging.INFO)
+    logging.basicConfig(filename="preprocess.log", filemode="w", level=logging.DEBUG)
     logging.debug(f" args: \n{args}")
     
     logging.info(" [preprocess] Obtain files ...") 
@@ -124,13 +124,14 @@ def preprocess(args):
 
     logging.info(" [preprocess] Obtain vocab ...")
     if args.vocab is None:
-        vocab = obtain_vocab(files, args.time_start, args.time_end)
+        vocab = obtain_vocab(files, args.time_start, args.time_end, size=args.size)
         save_vocab(vocab)
     else:
         vocab = load_vocab(args.vocab)
     
     logging.info(" [preprocess] Obtain positive samples ...")
     time_range = args.time_end - args.time_start + 1
+
     if args.positive is None:
         positive_samples = sample_positive(files, vocab, args.time_start, args.time_end, time_range)
         save_3d_matrix(positive_samples, name="positive_samples")
@@ -150,6 +151,7 @@ def cli_preprocess():
     parser.add_argument("--filedir", help="path of file dir")
     parser.add_argument("--time_start", type=int)
     parser.add_argument("--time_end", type=int)
+    parser.add_argument("--size", type=int, default=10000, help="size of vocab")
     parser.add_argument("--vocab", help="path of vocab")
     parser.add_argument("--positive", help="path of positive samples")
     parser.add_argument(
