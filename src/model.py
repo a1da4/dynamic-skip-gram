@@ -9,8 +9,9 @@ from tqdm import tqdm
 
 
 class SkipGramSmoothing:
-    def __init__(self, vocab, T, dim, D, taus, positive, negative):
+    def __init__(self, seed, vocab, T, dim, D, taus, positive, negative):
         """initialization
+        :param seed: int, random seed
         :param vocab: list(str), vocab
         :param T: int, time steps
         :param dim: int, dimension
@@ -18,13 +19,15 @@ class SkipGramSmoothing:
         :param taus: list(int), times observed (e.g. [1800, 1802, 1804, 1807])
         :param positive, negative: path, positive/negative samples counted in preproecss.py
         """
+        self.seed = seed
         self.vocab = vocab
         self.V = len(self.vocab)
         self.T = T
         self.D = dim
+        self.time_stamps = taus
         self.mean_target = np.zeros([self.V, dim, T])
         self.mean_context = np.zeros([self.V, dim, T])
-        self.val0 = 1
+        self.val0 = 1 
         self.vals = [D * (taus[t + 1] - taus[t]) for t in range(T - 1)]
         # precision: tridiagonal matrix
         self.precision = np.zeros([T, T])
@@ -132,7 +135,7 @@ class SkipGramSmoothing:
         """
         gamma = self._gamma(i, target_vec, sampled_context_ids, sampled_v)
         # mean_grad: (D, T)
-        mean_grad = (rate * gamma.T - self.precision @ target_vec.T).T
+        mean_grad = ((1 / rate) * gamma.T - self.precision @ target_vec.T).T
         v_grad = np.zeros([self.D, self.T])
         w_grad = np.zeros([self.D, self.T - 1])
         for d in range(self.D):
@@ -172,6 +175,7 @@ class SkipGramSmoothing:
 
         is_pretrain = rate < 1.0
         process = "pretrain" if is_pretrain else "train"
+        np.random.seed(self.seed)
 
         for step in range(iter):
             logging.info(f" [{process}] # {step}th iteration")
@@ -184,14 +188,14 @@ class SkipGramSmoothing:
                 # full-batch (train)
                 sampled_target_ids = [i for i in range(self.V)]
                 sampled_context_ids = [i for i in range(self.V)]
-            # sampled_target_ids = sample_minibatch(self.V, rate)
-            # sampled_context_ids = sample_minibatch(self.V, rate)
             logging.info(
                 f" [{process}] ### minibatch(target): {len(sampled_target_ids)} words"
             )
             logging.info(
                 f" [{process}] ### minibatch(context): {len(sampled_context_ids)} words"
             )
+            logging.debug(f" [{process}] ### sampled ids (target): \n{sampled_target_ids}")
+            logging.debug(f" [{process}] ### sampled ids (context): \n{sampled_context_ids}")
 
             sampled_u = np.zeros([len(sampled_target_ids), self.D, self.T])
             sampled_x_target = np.zeros(sampled_u.shape)
@@ -200,7 +204,6 @@ class SkipGramSmoothing:
 
             logging.info(f" [{process}] ## sample vectors...")
             for i in range(len(sampled_target_ids)):
-                # TODO 各次元でまとめて最適化
                 for d in range(self.D):
                     sampled_u_eachdim, x_target = self._sample_vec_eachdim(
                         self.v_target,
@@ -225,7 +228,13 @@ class SkipGramSmoothing:
             logging.info(f" [{process}] ### sampled_v (size): {sampled_v.shape}")
 
             # estimate gradient
-            logging.info(f" [{process}] ## estimate gradient and update...")
+            logging.info(f" [{process}] ## estimate gradient...")
+            d_mean_target = np.zeros(self.mean_target.shape)
+            d_w_target = np.zeros(self.w_target.shape)
+            d_v_target = np.zeros(self.v_target.shape)
+            d_mean_context = np.zeros(self.mean_context.shape)
+            d_w_context = np.zeros(self.w_context.shape)
+            d_v_context = np.zeros(self.v_context.shape)
             for i in tqdm(range(len(sampled_target_ids))):
                 # target_vec: (D, T)
                 target_vec = sampled_u[i]
@@ -240,11 +249,40 @@ class SkipGramSmoothing:
                 d_mean = optim.step(
                     step + 1, i, "mean_target", self.mean_target[i], mean_grad
                 )
-                self.mean_target[i] -= d_mean
+                d_mean_target[i] += d_mean
                 d_w = optim.step(step + 1, i, "w_target", self.w_target[i], w_grad)
-                self.w_target[i] -= d_w
+                d_w_target[i] += d_w
                 d_v = optim.step(step + 1, i, "v_target", self.v_target[i], v_grad)
-                self.v_target[i] = optim.update_enforce_positive(self.v_target[i], d_v)
+                d_v_target[i] += d_v
+
+                # context_vec: (D, T)
+                context_vec = sampled_v[i]
+                mean_grad, v_grad, w_grad = self._estimate_gradient(
+                    i,
+                    rate,
+                    context_vec,
+                    sampled_target_ids,
+                    sampled_u,
+                    sampled_x_context,
+                )
+                d_mean = optim.step(
+                    step + 1, i, "mean_context", self.mean_context[i], mean_grad
+                )
+                d_mean_context[i] += d_mean
+                d_w = optim.step(step + 1, i, "w_context", self.w_context[i], w_grad)
+                d_w_context[i] += d_w
+                d_v = optim.step(step + 1, i, "v_context", self.v_context[i], v_grad)
+                d_v_context[i] += d_v
+
+            logging.info(f" [{process}] ## update...")
+            self.mean_target += d_mean_target
+            self.w_target += d_w_target
+            self.mean_context += d_mean_context
+            self.w_context += d_w_context
+            for i in range(len(sampled_target_ids)):
+                self.v_target[i] = optim.update_enforce_positive(self.v_target[i], d_v_target[i])
+                self.v_context[i] = optim.update_enforce_positive(self.v_context[i], d_v_context[i])
+        
 
     def predict(self, word):
         """predict target word vector
