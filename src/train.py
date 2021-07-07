@@ -45,7 +45,7 @@ def main(args):
     logging.info(" [main] # finished!")
 
     logging.info(" [main] Training ...")
-    dwe.train(iter=args.train_iter, alpha=train_alpha, rate=1.0)
+    dwe.train(iter=args.train_iter, alpha=args.train_alpha, rate=1.0)
     logging.info(" [main] # finished!")
 
     logging.info(" [main] Save model ...")
