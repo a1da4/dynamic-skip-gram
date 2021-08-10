@@ -17,4 +17,4 @@ def cos(x, y):
     :return: value 
     """
     eps = 1e-8
-    return np.dot(x, y) / (np.linalg.norm(x) + np.linalg.norm(y) + eps)
+    return np.dot(x, y) / (np.linalg.norm(x) * np.linalg.norm(y) + eps)
