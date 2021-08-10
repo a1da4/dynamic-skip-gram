@@ -45,9 +45,10 @@ class SkipGramSmoothing:
                             + self.vals[i] ** (-1)
                         )
                     self.precision[i][j] = v
-                if i + 1 == j or i == j + 1:
-                    v = -self.vals[min(i, j)] ** (-1)
+                if (i == 0 and j > 0) or (i > 0 and j == 0):
+                    v = -self.vals[max(i, j) - 1] ** (-1)
                     self.precision[i][j] = v
+        logging.debug(f" [init] dwe.precision: \n{self.precision}")
         # precision = B^T@B, B: bidiagonal matrix
         # v, w: variational parameters
         # e.g. T=4
@@ -177,7 +178,7 @@ class SkipGramSmoothing:
         process = "pretrain" if is_pretrain else "train"
         np.random.seed(self.seed)
 
-        for step in range(iter):
+        for step in tqdm(range(iter)):
             logging.info(f" [{process}] # {step}th iteration")
             logging.info(f" [{process}] ## sampling minibatch...")
             if is_pretrain:
@@ -235,7 +236,8 @@ class SkipGramSmoothing:
             d_mean_context = np.zeros(self.mean_context.shape)
             d_w_context = np.zeros(self.w_context.shape)
             d_v_context = np.zeros(self.v_context.shape)
-            for i in tqdm(range(len(sampled_target_ids))):
+            #for i in tqdm(range(len(sampled_target_ids))):
+            for i in range(len(sampled_target_ids)):
                 # target_vec: (D, T)
                 target_vec = sampled_u[i]
                 mean_grad, v_grad, w_grad = self._estimate_gradient(
