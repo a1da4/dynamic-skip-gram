@@ -1,8 +1,11 @@
 import argparse
 import logging
 import os
+import string
+from collections import Counter 
 
 import numpy as np
+from nltk.corpus import stopwords
 from tqdm import tqdm
 
 from ioutils import *
@@ -14,27 +17,23 @@ def obtain_vocab(files, vocab_size=10000):
     :param vocab_size: int, vocab size
     :return: target_vocab
     """
-    vocab = []
-    id2freq = []
+    word2freq = Counter()
+    stop_words = set(stopwords.words("english")) | set(string.punctuation)
+
     for file in tqdm(files, "obtain vocab..."):
         logging.info(f" [obtain_vocab] # counting {file} ...")
         with open(file) as fp:
             for line in fp:
                 words = line.strip().split()
                 for word in words:
-                    if word not in vocab:
-                        vocab.append(word)
-                        id2freq.append(0)
-                    id = vocab.index(word)
-                    id2freq[id] += 1
+                    if word in stop_words:
+                        continue
+                    word2freq[word] += 1
         logging.info(" [obtain_vocab] ## finished!")
-        logging.debug(f" [obtain_vocab] ## vocab (size): {len(vocab)}")
-        logging.debug(f" [obtain_vocab] ## total freq: {sum(id2freq)}")
-    logging.debug(f" [obtain_vocab] # vocab: {len(vocab)} words: \n{vocab[:10]} ...")
+        logging.debug(f" [obtain_vocab] ## vocab (size): {len(word2freq)}")
+    logging.debug(f" [obtain_vocab] # vocab: {len(word2freq)} words")
 
-    target_ids = set(np.argsort(-1 * np.array(id2freq))[:size])
-
-    target_vocab = [vocab[id] for id in range(len(vocab)) if id in target_ids]
+    target_vocab = [w_f[0] for w_f in word2freq.most_common(vocab_size)]
     logging.debug(f" [obtain_vocab] # target_vocab: {len(target_vocab)} words")
     return target_vocab
 
@@ -46,6 +45,7 @@ def sample_positive(files, vocab, window_size=4):
     :param window_size:
     :return: positive_samples (T, V, V)
     """
+
     positive_samples = []
     set_vocab = set(vocab)
     logging.info(" [sample_positive] # initialize positive samples ...")
@@ -53,32 +53,34 @@ def sample_positive(files, vocab, window_size=4):
         ps_tmp = [[0 for _ in range(len(vocab))] for _ in range(len(vocab))]
         positive_samples.append(ps_tmp)
         del ps_tmp
-    logging.info(f" [sample_positive] # finished! (size): ({len(positive_samples)}, {len(positive_samples[0])}, {len(positive_samples[0][0])}")
+    logging.info(f" [sample_positive] # finished! (size): ({len(positive_samples)}, {len(positive_samples[0])}, {len(positive_samples[0][0])})")
 
     for t, file in tqdm(enumerate(files), "obtrain positive samples..."):
         logging.info(f" [sample_positive] # counting {file} ...")
         with open(file) as fp:
             for line in fp:
                 words = line.strip().split()
-                for target_id in range(len(words)):
-                    target_word = words[target_id]
+                for position_id in range(len(words)):
+                    target_word = words[position_id]
                     if target_word not in set_vocab:
                         continue
                     target_id = vocab.index(target_word)
                     
                     for shift in range(1, window_size + 1):
-                        left_id = target_id - shift
-                        right_id = target_id + shift
+                        left_id = position_id - shift
+                        right_id = position_id + shift
 
                         if left_id >= 0:
                             left_context_word = words[left_id]
-                            left_context_id = vocab.index(left_context_word)
-                            positive_samples[t][target_id][left_context_id] += 1
+                            if left_context_word in set_vocab:
+                                left_context_id = vocab.index(left_context_word)
+                                positive_samples[t][target_id][left_context_id] += 1
                         
                         if right_id < len(words):
                             right_context_word = words[right_id]
-                            right_context_id = vocab.index(right_context_word)
-                            positive_samples[t][target_id][right_context_id] += 1
+                            if right_context_word in set_vocab:
+                                right_context_id = vocab.index(right_context_word)
+                                positive_samples[t][target_id][right_context_id] += 1
                         
             logging.info(" [sample_positive] ## finished!")
     return positive_samples
@@ -92,7 +94,7 @@ def sample_negative(vocab, positive_samples, num_samples):
     """
     os.makedirs(f"../negative_samples", exist_ok=True)
 
-    for t in tqdm(len(positive_samples), "obtain negative samples..."):
+    for t in tqdm(range(len(positive_samples)), "obtain negative samples..."):
         # total_freq_t: single value
         total_freq_t = sum([sum(ps_tmp) for ps_tmp in positive_samples[t]])
         # freq_matrix_t: (V, V) matrix
