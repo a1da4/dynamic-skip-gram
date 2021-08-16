@@ -1,3 +1,4 @@
 src/__pychache__
 *.log
-scripts/
+scripts
+coha_1900_1990
