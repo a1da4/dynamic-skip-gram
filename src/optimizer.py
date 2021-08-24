@@ -27,8 +27,8 @@ class Adam():
         :return: d (update step)
         """
         param_id = self.name2id[param_name]
-        self.m1[param_id][i] += self.beta1 * self.m1[param_id][i] + (1 - self.beta1) * grad
-        self.m2[param_id][i] += self.beta2 * self.m2[param_id][i] + (1 - self.beta2) * (grad**2)
+        self.m1[param_id][i] = self.beta1 * self.m1[param_id][i] + (1 - self.beta1) * grad
+        self.m2[param_id][i] = self.beta2 * self.m2[param_id][i] + (1 - self.beta2) * (grad**2)
         bias_corrected_m1 = self.m1[param_id][i] / (1 - self.beta1**t)
         bias_corrected_m2 = self.m2[param_id][i] / (1 - self.beta2**t)
         d = self.alpha * bias_corrected_m1 / (np.sqrt(bias_corrected_m2) + self.eta)
