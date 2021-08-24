@@ -2,8 +2,11 @@ import argparse
 import logging
 import os
 import gzip
+import string
+from collections import Counter
 
 import numpy as np
+from nltk.corpus import stopwords
 from tqdm import tqdm
 
 from ioutils import *
@@ -16,8 +19,11 @@ def obtain_vocab(files, time_start, time_end, size):
     :param size: int, vocab size
     :return: target_vocab
     """
-    vocab = []
-    id2freq = []
+    #vocab = []
+    #id2freq = []
+    word2freq = Counter()
+    stop_words = set(stopwords.words("english")) | set(string.punctuation)
+
     for file in tqdm(files, "obtain vocab..."):
         logging.info(f" [obtain_vocab] # counting {file} ...")
         with gzip.open(file) as fp:
@@ -26,35 +32,40 @@ def obtain_vocab(files, time_start, time_end, size):
                 words = words.split()
                 if time_start <= int(year) <= time_end:
                     for word in words:
-                        if word not in vocab:
-                            vocab.append(word)
-                            id2freq.append(0)
-                        id = vocab.index(word)
-                        id2freq[id] += int(freq)
+                        #if word not in vocab:
+                            #vocab.append(word)
+                            #id2freq.append(0)
+                        #id = vocab.index(word)
+                        #id2freq[id] += int(freq)
+                        if word in stop_words:
+                            continue
+                        word2freq[word] += 1
         logging.info(" [obtain_vocab] ## finished!")
-        logging.debug(f" [obtain_vocab] ## vocab (size): {len(vocab)}")
-        logging.debug(f" [obtain_vocab] ## total freq: {sum(id2freq)}")
-    logging.debug(f" [obtain_vocab] # vocab: {len(vocab)} words: \n{vocab[:10]} ...")
+        #logging.debug(f" [obtain_vocab] ## vocab (size): {len(vocab)}")
+        logging.debug(f" [obtain_vocab] ## vocab (size): {len(word2freq)}")
+        #logging.debug(f" [obtain_vocab] ## total freq: {sum(id2freq)}")
+    #logging.debug(f" [obtain_vocab] # vocab: {len(vocab)} words: \n{vocab[:10]} ...")
+    logging.debug(f" [obtain_vocab] # vocab: {len(word2freq)} words")
 
-    target_ids = set(np.argsort(-1 * np.array(id2freq))[:size])
-
-    target_vocab = [vocab[id] for id in range(len(vocab)) if id in target_ids]
+    #target_ids = set(np.argsort(-1 * np.array(id2freq))[:size])
+    target_vocab = [w_f[0] for w_f in word2freq.most_common(size)]
+    #target_vocab = [vocab[id] for id in range(len(vocab)) if id in target_ids]
     logging.debug(f" [obtain_vocab] # target_vocab: {len(target_vocab)} words")
     return target_vocab
 
 
-def sample_positive(files, vocab, time_start, time_end, time_range):
+def sample_positive(files, vocab, time_start, time_end, num_timebins):
     """
     :param files:
     :param vocab:
     :param time_start, time_end: int
-    :param time_range: int, total time span
+    :param num_timebins: int, total time span
     :return: positive_samples (T, V, V)
     """
     positive_samples = []
     set_vocab = set(vocab)
     logging.info(" [sample_positive] # initialize positive samples ...")
-    for t in range(time_range):
+    for t in range(num_timebins):
         ps_tmp = [[0 for _ in range(len(vocab))] for _ in range(len(vocab))]
         positive_samples.append(ps_tmp)
         del ps_tmp
@@ -83,16 +94,16 @@ def sample_positive(files, vocab, time_start, time_end, time_range):
     return positive_samples
 
 
-def sample_negative(vocab, positive_samples, num_samples, time_range):
+def sample_negative(vocab, positive_samples, num_samples, num_timebins):
     """negative sampling
     :param vocab:
     :param positive_samples: co-occur matrix (T,V,V)
     :param num_samples: int, number of negative sample(s)
-    :param time_range: int, total time span
+    :param num_timebins: int, total time span
     """
     os.makedirs(f"../negative_samples", exist_ok=True)
 
-    for t in tqdm(range(time_range), "obtain negative samples..."):
+    for t in tqdm(range(num_timebins), "obtain negative samples..."):
         # total_freq_t: single value
         total_freq_t = sum([sum(ps_tmp) for ps_tmp in positive_samples[t]])
         # freq_matrix_t: (V, V) matrix
@@ -130,19 +141,19 @@ def preprocess(args):
         vocab = load_vocab(args.vocab)
     
     logging.info(" [preprocess] Obtain positive samples ...")
-    time_range = args.time_end - args.time_start + 1
+    num_timebins = args.time_end - args.time_start + 1
 
     if args.positive is None:
-        positive_samples = sample_positive(files, vocab, args.time_start, args.time_end, time_range)
+        positive_samples = sample_positive(files, vocab, args.time_start, args.time_end, num_timebins)
         save_3d_matrix(positive_samples, name="positive_samples")
     else:
         positive_samples = load_3d_matrix(
-            args.positive, z_size=time_range, x_size=len(vocab), y_size=len(vocab)
+            args.positive, z_size=num_timebins, x_size=len(vocab), y_size=len(vocab)
         )
 
     logging.info(" [preprocess] Obtain negative samples ...")
     sample_negative(
-        vocab, positive_samples, args.num_samples, time_range
+        vocab, positive_samples, args.num_samples, num_timebins
     )
 
 
