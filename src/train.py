@@ -9,19 +9,19 @@ from model import *
 
 
 def main(args):
-    #logging.basicConfig(filename="train.log", filemode="w", level=logging.INFO)
-    logging.basicConfig(filename="train_debug.log", filemode="w", level=logging.DEBUG)
+    #logging.basicConfig(filename="../train.log", filemode="w", level=logging.INFO)
+    logging.basicConfig(filename="../train_debug.log", filemode="w", level=logging.DEBUG)
 
     logging.info(" [main] Initialization ...")
     vocab = load_vocab(args.vocab)
-    time_range = args.time_end - args.time_start + 1
+    num_timebins = (args.time_end - args.time_start) // args.time_span + 1
     dwe = SkipGramSmoothing(
         seed=args.seed,
         vocab=vocab,
-        T=time_range,
+        T=num_timebins,
         dim=args.dim,
         D=args.diffusion,
-        taus=range(args.time_start, args.time_end + 1),
+        taus=range(args.time_start, args.time_end + 1, args.time_span),
         positive=args.positive,
         negative=args.negative,
     )
@@ -61,6 +61,7 @@ def cli_main():
     parser.add_argument("--vocab", help="path of vocab")
     parser.add_argument("--time_start", type=int)
     parser.add_argument("--time_end", type=int)
+    parser.add_argument("--time_span", type=int, default=1)
     parser.add_argument("--dim", type=int, default=100)
     parser.add_argument(
         "--diffusion",
