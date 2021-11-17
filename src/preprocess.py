@@ -23,12 +23,18 @@ def obtain_vocab(files, vocab_size=10000):
     for file in tqdm(files, "obtain vocab..."):
         logging.info(f" [obtain_vocab] # counting {file} ...")
         with open(file) as fp:
+            word2freq_each = Counter()
+            num_words = 0
             for line in fp:
                 words = line.strip().split()
                 for word in words:
                     if word in stop_words:
                         continue
-                    word2freq[word] += 1
+                    word2freq_each[word] += 1
+                    num_words += 1
+            for w_f in word2freq_each.most_common():
+                w, _ = w_f
+                word2freq[w] += word2freq_each[w] / num_words
         logging.info(" [obtain_vocab] ## finished!")
         logging.debug(f" [obtain_vocab] ## vocab (size): {len(word2freq)}")
     logging.debug(f" [obtain_vocab] # vocab: {len(word2freq)} words")

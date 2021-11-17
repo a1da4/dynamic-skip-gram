@@ -27,8 +27,10 @@ class SkipGramSmoothing:
         self.time_stamps = taus
         self.mean_target = np.zeros([self.V, dim, T])
         self.mean_context = np.zeros([self.V, dim, T])
+        self.diff = D
         self.val0 = 10 
-        self.vals = [D * (taus[t + 1] - taus[t]) for t in range(T - 1)]
+        #self.vals = [D * (taus[t + 1] - taus[t]) for t in range(T - 1)]
+        self.vals = [self.diff * (taus[t + 1] - taus[t]) for t in range(T - 1)]
         # precision: tridiagonal matrix
         self.precision = np.zeros([T, T])
         for i in range(self.T):
