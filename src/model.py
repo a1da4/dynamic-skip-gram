@@ -9,7 +9,8 @@ from tqdm import tqdm
 
 
 class SkipGramSmoothing:
-    def __init__(self, seed, vocab, T, dim, D, taus, positive, negative):
+    #def __init__(self, seed, vocab, T, dim, D, taus, positive, negative):
+    def __init__(self, seed, vocab, T, dim, D, taus):
         """initialization
         :param seed: int, random seed
         :param vocab: list(str), vocab
@@ -17,7 +18,7 @@ class SkipGramSmoothing:
         :param dim: int, dimension
         :param D: float, global diffusion
         :param taus: list(int), times observed (e.g. [1800, 1802, 1804, 1807])
-        :param positive, negative: path, positive/negative samples counted in preproecss.py
+        #:param positive, negative: path, positive/negative samples counted in preproecss.py
         """
         self.seed = seed
         self.vocab = vocab
@@ -28,7 +29,7 @@ class SkipGramSmoothing:
         self.mean_target = np.zeros([self.V, dim, T])
         self.mean_context = np.zeros([self.V, dim, T])
         self.diff = D
-        self.val0 = 10 
+        self.val0 = 1 
         #self.vals = [D * (taus[t + 1] - taus[t]) for t in range(T - 1)]
         self.vals = [self.diff * (taus[t + 1] - taus[t]) for t in range(T - 1)]
         # precision: tridiagonal matrix
@@ -65,6 +66,7 @@ class SkipGramSmoothing:
         self.w_target = np.tile(w, (self.V, dim, 1))
         self.v_context = np.tile(v, (self.V, dim, 1))
         self.w_context = np.tile(w, (self.V, dim, 1))
+        """
         # load positive and negative samples
         self.positives = load_3d_matrix(
             positive, z_size=self.T, x_size=self.V, y_size=self.V
@@ -72,6 +74,7 @@ class SkipGramSmoothing:
         self.negatives = load_3d_matrix(
             negative, z_size=self.T, x_size=self.V, y_size=self.V
         )
+        """
 
     def _sample_minibatch(self, V, rate=0.1):
         """sampling vocab
@@ -103,8 +106,9 @@ class SkipGramSmoothing:
         sampled_vec = mean[word_id][dim_id] + x
         return sampled_vec, x
 
-    def _gamma(self, i, target_vec, sampled_context_ids, sampled_v):
+    def _gamma(self, dataloader, i, target_vec, sampled_context_ids, sampled_v):
         """gamma function in each time (Eq. S12)
+        :param dataloader: class, contains positive/negative samples
         :param i: int, index of sampled_target_ids
         :param target_vec: vec(D, T)
         :param sampled_context_ids: list(int), context ids
@@ -115,8 +119,10 @@ class SkipGramSmoothing:
         target_vec = target_vec.T
         for t in range(self.T):
             # n_p, n_n: (len(sampled_context_ids))
-            n_p = np.array(self.positives[t][i])[sampled_context_ids]
-            n_n = np.array(self.negatives[t][i])[sampled_context_ids]
+            #n_p = np.array(self.positives[t][i])[sampled_context_ids]
+            #n_n = np.array(self.negatives[t][i])[sampled_context_ids]
+            n_p = np.array(dataloader.positives[t][i])[sampled_context_ids]
+            n_n = np.array(dataloader.negatives[t][i])[sampled_context_ids]
             # context_vecs: (len(sampled_context_ids), D)
             context_vecs = sampled_v.T[t].T 
             # gamma_eachtime: (D)
@@ -125,9 +131,10 @@ class SkipGramSmoothing:
         return gamma
 
     def _estimate_gradient(
-        self, i, rate, target_vec, sampled_context_ids, sampled_v, sampled_x_target
+        self, dataloader, i, rate, target_vec, sampled_context_ids, sampled_v, sampled_x_target
     ):
         """estimate gradient for each word
+        :param dataloader: class, contains positive/negative samples
         :param i: int, target word index
         :param rate: float, % of vocab
         :param target_vec: sampled target vector (D, T)
@@ -136,7 +143,7 @@ class SkipGramSmoothing:
         :param sampled_x_target: sampled gaussian noise (V*rate, D, T)
         :return: mean_grad (D, T), v_grad (D, T), w_grad (D, T-1)
         """
-        gamma = self._gamma(i, target_vec, sampled_context_ids, sampled_v)
+        gamma = self._gamma(dataloader, i, target_vec, sampled_context_ids, sampled_v)
         # mean_grad: (D, T)
         mean_grad = ((1 / rate) * gamma.T - self.precision @ target_vec.T).T
         v_grad = np.zeros([self.D, self.T])
@@ -151,8 +158,9 @@ class SkipGramSmoothing:
             w_grad[d] += -y_eachdim[:-1] * sampled_x_target[i][d][1:]
         return mean_grad, v_grad, w_grad
 
-    def train(self, iter, alpha=0.01, beta1=0.9, beta2=0.999, eta=1e-8, rate=1.0):
+    def train(self, dataloader, iter, alpha=0.01, beta1=0.9, beta2=0.999, eta=1e-8, rate=1.0):
         """pre-train using minibatch (10% of vocab)
+        :param dataloader: class, contains positive/negative samples
         :param iter: int, iteration
         :param alpha: float, learning rate of Adam
         :param beta1, beta2: float, decay rate of 1st/2nd moment estimate of Adam
@@ -243,6 +251,7 @@ class SkipGramSmoothing:
                 # target_vec: (D, T)
                 target_vec = sampled_u[i]
                 mean_grad, v_grad, w_grad = self._estimate_gradient(
+                    dataloader,
                     i,
                     rate,
                     target_vec,
@@ -262,6 +271,7 @@ class SkipGramSmoothing:
                 # context_vec: (D, T)
                 context_vec = sampled_v[i]
                 mean_grad, v_grad, w_grad = self._estimate_gradient(
+                    dataloader,
                     i,
                     rate,
                     context_vec,
