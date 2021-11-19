@@ -9,7 +9,6 @@ def save_vocab(vocab):
             fp.write(f"{word}\n")
     logging.info(" [save_vocab] ## finished!")
 
-
 def load_vocab(vocab_path):
     logging.info(" [load_vocab] # loading vocaburaly...")
     vocab = []
@@ -20,7 +19,6 @@ def load_vocab(vocab_path):
     logging.info(" [load_vocab] ## finished!")
     return vocab
 
-
 def save_2d_matrix(matrix, name):
     logging.debug(" [save_2d_matrix] ## saving matrix...")
     with open(f"../{name}.txt", "w") as fp:
@@ -28,7 +26,6 @@ def save_2d_matrix(matrix, name):
             col_nonzero = [f"{id}:{v}" for id, v in enumerate(col) if v > 0]
             fp.write(f"{' '.join(col_nonzero)}\n")
     logging.debug(" [save_2d_matrix] ## finished!")
-
 
 def save_3d_matrix(matrix, name):
     logging.info(" [save_3d_matrix] # saving matrix...")
@@ -60,3 +57,12 @@ def load_3d_matrix(matrix_path, z_size, x_size, y_size):
         del matrix_2d
     logging.info(" [load_3d_matrix] # finished!")
     return matrix_3d
+
+class DataLoader():
+    def __init__(self, vocab_size, num_timebins, positive_path, negative_path):
+        self.positives = load_3d_matrix(
+                positive_path, z_size=num_timebins, x_size=vocab_size, y_size=vocab_size
+        )
+        self.negatives = load_3d_matrix(
+                negative_path, z_size=num_timebins, x_size=vocab_size, y_size=vocab_size
+        )

@@ -15,6 +15,9 @@ def main(args):
     logging.info(" [main] Initialization ...")
     vocab = load_vocab(args.vocab)
     num_timebins = (args.time_end - args.time_start) // args.time_span + 1
+
+    dataloader = DataLoader(len(vocab), num_timebins, args.positive, args.negative)
+
     dwe = SkipGramSmoothing(
         seed=args.seed,
         vocab=vocab,
@@ -22,8 +25,8 @@ def main(args):
         dim=args.dim,
         D=args.diffusion,
         taus=range(args.time_start, args.time_end + 1, args.time_span),
-        positive=args.positive,
-        negative=args.negative,
+        #positive=args.positive,
+        #negative=args.negative,
     )
     logging.debug(" [main] # model: SkipGramSmoothing")
     logging.debug(f" [main] # dwe.vocab: {len(dwe.vocab)} words")
@@ -41,11 +44,11 @@ def main(args):
     logging.debug(f" [main] # dwe.w (value): \n{dwe.w_target[0][0]}")
 
     logging.info(" [main] Pre-training ...")
-    dwe.train(iter=args.pretrain_iter, alpha=args.pretrain_alpha, rate=0.1)
+    dwe.train(dataloader, iter=args.pretrain_iter, alpha=args.pretrain_alpha, rate=0.1)
     logging.info(" [main] # finished!")
 
     logging.info(" [main] Training ...")
-    dwe.train(iter=args.train_iter, alpha=args.train_alpha, rate=1.0)
+    dwe.train(dataloader, iter=args.train_iter, alpha=args.train_alpha, rate=1.0)
     logging.info(" [main] # finished!")
 
     logging.info(" [main] Save model ...")
