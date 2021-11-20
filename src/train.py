@@ -45,16 +45,15 @@ def main(args):
 
     logging.info(" [main] Pre-training ...")
     dwe.train(dataloader, iter=args.pretrain_iter, alpha=args.pretrain_alpha, rate=0.1)
+    pickle.dump(dwe, open(f"../dwe_pretrained_ckpt-{args.pretrain_iter}.pkl", "wb"))
     logging.info(" [main] # finished!")
 
     logging.info(" [main] Training ...")
-    dwe.train(dataloader, iter=args.train_iter, alpha=args.train_alpha, rate=1.0)
+    dwe.train(dataloader, iter=args.train_iter, alpha=args.train_alpha, rate=1.0, ckpt_span)
     logging.info(" [main] # finished!")
 
     logging.info(" [main] Save model ...")
-    dwe.positives = None
-    dwe.negatives = None
-    pickle.dump(dwe, open("../dwe.pkl", "wb"))
+    pickle.dump(dwe, open(f"../dwe_ckpt-{args.train_iter}.pkl", "wb"))
     logging.info(" [main] # finished!")
 
 
@@ -88,6 +87,9 @@ def cli_main():
     )
     parser.add_argument(
         "--train_alpha", type=float, default=0.001, help="learning rate during training"
+    )
+    parser.add_argument(
+        "--ckpt_span", type=int, default=10, help="(only fullbatch) save ckpt in each ckpt_span iter"
     )
     args = parser.parse_args()
     main(args)

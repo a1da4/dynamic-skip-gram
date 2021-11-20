@@ -18,7 +18,6 @@ class SkipGramSmoothing:
         :param dim: int, dimension
         :param D: float, global diffusion
         :param taus: list(int), times observed (e.g. [1800, 1802, 1804, 1807])
-        #:param positive, negative: path, positive/negative samples counted in preproecss.py
         """
         self.seed = seed
         self.vocab = vocab
@@ -66,15 +65,6 @@ class SkipGramSmoothing:
         self.w_target = np.tile(w, (self.V, dim, 1))
         self.v_context = np.tile(v, (self.V, dim, 1))
         self.w_context = np.tile(w, (self.V, dim, 1))
-        """
-        # load positive and negative samples
-        self.positives = load_3d_matrix(
-            positive, z_size=self.T, x_size=self.V, y_size=self.V
-        )
-        self.negatives = load_3d_matrix(
-            negative, z_size=self.T, x_size=self.V, y_size=self.V
-        )
-        """
 
     def _sample_minibatch(self, V, rate=0.1):
         """sampling vocab
@@ -119,8 +109,6 @@ class SkipGramSmoothing:
         target_vec = target_vec.T
         for t in range(self.T):
             # n_p, n_n: (len(sampled_context_ids))
-            #n_p = np.array(self.positives[t][i])[sampled_context_ids]
-            #n_n = np.array(self.negatives[t][i])[sampled_context_ids]
             n_p = np.array(dataloader.positives[t][i])[sampled_context_ids]
             n_n = np.array(dataloader.negatives[t][i])[sampled_context_ids]
             # context_vecs: (len(sampled_context_ids), D)
@@ -158,7 +146,7 @@ class SkipGramSmoothing:
             w_grad[d] += -y_eachdim[:-1] * sampled_x_target[i][d][1:]
         return mean_grad, v_grad, w_grad
 
-    def train(self, dataloader, iter, alpha=0.01, beta1=0.9, beta2=0.999, eta=1e-8, rate=1.0):
+    def train(self, dataloader, iter, alpha=0.01, beta1=0.9, beta2=0.999, eta=1e-8, rate=1.0, ckpt_span=10):
         """pre-train using minibatch (10% of vocab)
         :param dataloader: class, contains positive/negative samples
         :param iter: int, iteration
@@ -166,6 +154,7 @@ class SkipGramSmoothing:
         :param beta1, beta2: float, decay rate of 1st/2nd moment estimate of Adam
         :param eta: float, regularizer of Adam
         :param rate: float, % of vocab.
+        :param ckpt_span: int, save checkpoint in each ckpt_span iter (fullbatch only)
         """
 
         # optimize with Adam
@@ -296,6 +285,10 @@ class SkipGramSmoothing:
             for i in range(len(sampled_target_ids)):
                 self.v_target[i] = optim.update_enforce_positive(self.v_target[i], d_v_target[i])
                 self.v_context[i] = optim.update_enforce_positive(self.v_context[i], d_v_context[i])
+            
+            if process == "train" and step % ckpt_span == 0:
+                ckpt_path = open(f"../dwe_ckpt-{step}.pkl", "wb")
+
         
 
     def predict(self, word):
