@@ -286,7 +286,7 @@ class SkipGramSmoothing:
                 self.v_target[i] = optim.update_enforce_positive(self.v_target[i], d_v_target[i])
                 self.v_context[i] = optim.update_enforce_positive(self.v_context[i], d_v_context[i])
             
-            if process == "train" and step % ckpt_span == 0:
+            if process == "train" and (step + 1) % ckpt_span == 0:
                 ckpt_path = open(f"../dwe_ckpt-{step}.pkl", "wb")
 
         
