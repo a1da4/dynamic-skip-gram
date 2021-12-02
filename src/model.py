@@ -46,9 +46,10 @@ class SkipGramSmoothing:
                             + self.vals[i] ** (-1)
                         )
                     self.precision[i][j] = v
-                if (i == 0 and j > 0) or (i > 0 and j == 0):
-                    v = -self.vals[max(i, j) - 1] ** (-1)
+                if i + 1 == j:
+                    v = -self.vals[i] ** (-1)
                     self.precision[i][j] = v
+                    self.precision[j][i] = v
         logging.debug(f" [init] dwe.precision: \n{self.precision}")
         # precision = B^T@B, B: bidiagonal matrix
         # v, w: variational parameters
