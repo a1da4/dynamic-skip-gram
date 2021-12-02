@@ -47,7 +47,7 @@ def main(args):
     logging.info(" [main] # finished!")
 
     logging.info(" [main] Training ...")
-    dwe.train(dataloader, iter=args.train_iter, alpha=args.train_alpha, rate=1.0, ckpt_span=ckpt_span)
+    dwe.train(dataloader, iter=args.train_iter, alpha=args.train_alpha, rate=1.0, ckpt_span=args.ckpt_span)
     logging.info(" [main] # finished!")
 
     logging.info(" [main] Save model ...")
